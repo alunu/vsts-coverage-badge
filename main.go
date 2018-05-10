@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"sort"
 	"vsts-coverage-badge/awsfunctions"
 	"vsts-coverage-badge/vsts"
@@ -15,6 +15,18 @@ import (
 
 func main() {
 	lambda.Start(Handler)
+	//http.HandleFunc("/", localHTTPHandler)
+	//http.ListenAndServe("localhost:8080", nil)
+}
+
+func localHTTPHandler(w http.ResponseWriter, r *http.Request) {
+	svg, err := generateSvgText(r.URL.Query().Get("string"))
+	if err != nil {
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Header().Add("Content-Type", "image/svg+xml")
+	w.Write([]byte(svg))
 }
 
 func returnError(err error) (events.APIGatewayProxyResponse, error) {
@@ -75,14 +87,42 @@ func renderSvg() ([]byte, error) {
 		percentageText = fmt.Sprintf("%.f%%", coverageValue)
 	}
 
-	svg, err := ioutil.ReadFile("badge.svg")
+	svgText, err := generateSvgText(percentageText)
 	if err != nil {
-		errorString := fmt.Sprintf("Could not read badge.svg, %s", err.Error())
-		return nil, errors.New(errorString)
+		return nil, err
 	}
 
-	svgText := fmt.Sprintf(string(svg), percentageText)
 	return []byte(svgText), nil
+}
+
+func generateSvgText(text string) (string, error) {
+	// could do some math to work out proper length based on character
+	// but for my use case right now theres only 4 cases, so just do them
+	width := 94
+	textLength := 250
+	x := 755
+	if len(text) == 2 { //single digit
+		textLength = 195
+	} else if len(text) == 4 {
+		width = 100
+		textLength = 310
+		x = 790
+	} else if text == "unknown" {
+		width = 118
+		textLength = 480
+		x = 880
+	} else if len(text) != 3 {
+		return "", fmt.Errorf("Text %s was not recognized", text)
+	}
+	h := width - 59
+
+	svg, err := ioutil.ReadFile("badge.svg")
+	if err != nil {
+		return "", fmt.Errorf("Could not read badge.svg, %s", err.Error())
+	}
+
+	svgText := fmt.Sprintf(string(svg), width, h, x, textLength, text)
+	return svgText, nil
 }
 
 func calculateCodeCoverage() (float32, error) {
@@ -91,7 +131,7 @@ func calculateCodeCoverage() (float32, error) {
 		return -1, err
 	}
 	if len(builds) == 0 {
-		return -1, fmt.Errorf("No builds found.")
+		return -1, fmt.Errorf("no builds found")
 	}
 
 	sort.Sort(vsts.ByFinishTimeDesc(builds))
@@ -105,6 +145,9 @@ func calculateCodeCoverage() (float32, error) {
 	for _, stat := range testRuns {
 		covered += stat.BlocksCovered
 		notCovered += stat.BlocksNotCovered
+	}
+	if notCovered+covered == 0 {
+		return -1, fmt.Errorf("denominator was 0")
 	}
 	return (float32(covered) / float32(notCovered+covered)) * 100, nil
 }
