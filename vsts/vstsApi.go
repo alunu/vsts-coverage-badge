@@ -19,7 +19,11 @@ var accessToken = os.Getenv("VSTS_ACCESS_TOKEN")
 // GetBuilds gets a list of all the builds for the current project
 func GetBuilds() ([]Build, error) {
 	url := fmt.Sprintf("https://%s.visualstudio.com/%s/_apis/build/builds?api-version=5.0-preview.4", TenantName, ProjectName)
-	body := rest.Get(url, accessToken)
+	body, err := rest.Get(url, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
 	var builds buildList
 	if err := json.Unmarshal(body, &builds); err != nil {
 		return nil, fmt.Errorf("Failed to unmarshal Build JSON, %v", err)
@@ -32,7 +36,11 @@ func GetBuilds() ([]Build, error) {
 // GetCodeCoverageStatistics Gets the statistics (blocks/lines covered) for the specified build
 func GetCodeCoverageStatistics(build *Build) ([]CodeCoverageStatistic, error) {
 	url := fmt.Sprintf("https://%s.visualstudio.com/%s/_apis/test/codecoverage?api-version=5.0-preview.1&flags=7&buildId=%v", TenantName, ProjectName, build.ID)
-	body := rest.Get(url, accessToken)
+	body, err := rest.Get(url, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
 	var codeCoverageList codeCoverageList
 	if err := json.Unmarshal(body, &codeCoverageList); err != nil {
 		return nil, fmt.Errorf("Failed to unmarshal Code Coverage JSON, %v", err)
