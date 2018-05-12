@@ -31,7 +31,7 @@ func localHTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 func returnError(err error) (events.APIGatewayProxyResponse, error) {
 	headers := make(map[string]string)
-	headers["Content-Type"] = "plain/text"
+	headers["Content-Type"] = "text/plain"
 	return events.APIGatewayProxyResponse{
 		Body:            err.Error(),
 		StatusCode:      500,
