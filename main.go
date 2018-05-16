@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -25,7 +27,10 @@ func localHTTPHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+
 	w.Header().Add("Content-Type", "image/svg+xml")
+	w.Header().Add("cache-control", "no-cache")
+	w.Header().Add("ETag", getHash([]byte(svg))[1:64])
 	w.Write([]byte(svg))
 }
 
@@ -38,6 +43,12 @@ func returnError(err error) (events.APIGatewayProxyResponse, error) {
 		IsBase64Encoded: false,
 		Headers:         headers,
 	}, nil
+}
+
+func getHash(input []byte) string {
+	h := sha1.New()
+	hashBytes := h.Sum(input)
+	return base64.StdEncoding.EncodeToString(hashBytes)
 }
 
 // Handler handles the request from API Gateway
@@ -71,6 +82,8 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 	headers := make(map[string]string)
 	headers["Content-Type"] = "image/svg+xml"
+	headers["cache-control"] = "no-cache"
+	headers["ETag"] = getHash(svg)[1:64]
 	response := events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers:    headers,
